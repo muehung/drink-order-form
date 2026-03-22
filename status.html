@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>訂單追蹤 — 珍珠奶茶屋</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1209;
+      --paper: #f5efe3;
+      --cream: #ede4d0;
+      --amber: #c8841a;
+      --rust: #b84c1e;
+      --sage: #5c7a5e;
+      --border: #c4b49a;
+      --muted: #8a7a60;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Noto Serif TC', serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(200,132,26,.07) 0%, transparent 55%),
+        radial-gradient(circle at 85% 85%, rgba(92,122,94,.06) 0%, transparent 55%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .page-wrap {
+      position: relative; z-index: 1;
+      max-width: 600px; margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 2rem 0 1.8rem;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    header::after {
+      content: '✦  訂單追蹤  ✦';
+      display: block;
+      font-size: .68rem; letter-spacing: .35em;
+      color: var(--amber); margin-top: .5rem;
+      font-family: 'DM Mono', monospace;
+    }
+    .brand-icon { font-size: 2.4rem; display: block; margin-bottom: .4rem; }
+    h1 { font-size: 1.6rem; font-weight: 900; }
+    .order-id-display {
+      font-family: 'DM Mono', monospace;
+      font-size: .82rem; color: var(--amber);
+      margin-top: .4rem; letter-spacing: .1em;
+    }
+
+    /* ── Section ── */
+    .section {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      margin-bottom: 1.5rem;
+      box-shadow: 3px 3px 0 var(--cream);
+      overflow: hidden;
+    }
+    .section-header {
+      padding: .9rem 1.4rem;
+      background: var(--ink); color: var(--paper);
+      display: flex; align-items: center; gap: .6rem;
+      font-weight: 600; font-size: .88rem; letter-spacing: .08em;
+    }
+    .section-body { padding: 1.4rem; }
+
+    /* ── Status Steps ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      position: relative;
+    }
+
+    /* vertical line between steps */
+    .step:not(:last-child) .step-line {
+      position: absolute;
+      left: 19px; top: 38px;
+      width: 2px; height: calc(100% - 8px);
+      background: var(--border);
+      transition: background .6s ease;
+    }
+    .step.done:not(:last-child) .step-line,
+    .step.active:not(:last-child) .step-line {
+      background: var(--amber);
+    }
+
+    .step-icon-wrap {
+      flex-shrink: 0;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      background: var(--paper);
+      transition: all .5s cubic-bezier(.34,1.56,.64,1);
+      position: relative; z-index: 1;
+    }
+    .step.done .step-icon-wrap {
+      background: var(--amber); border-color: var(--amber);
+      box-shadow: 0 0 0 4px rgba(200,132,26,.2);
+    }
+    .step.active .step-icon-wrap {
+      background: var(--ink); border-color: var(--ink);
+      box-shadow: 0 0 0 4px rgba(26,18,9,.12);
+      animation: pulse-ring .8s ease infinite;
+    }
+    @keyframes pulse-ring {
+      0%,100% { box-shadow: 0 0 0 4px rgba(26,18,9,.12); }
+      50%      { box-shadow: 0 0 0 8px rgba(26,18,9,.05); }
+    }
+
+    .step-content {
+      padding: .5rem 0 1.4rem;
+      flex: 1;
+    }
+    .step-title {
+      font-size: .95rem; font-weight: 600;
+      color: var(--muted);
+      transition: color .4s;
+    }
+    .step.done .step-title, .step.active .step-title { color: var(--ink); }
+    .step-desc {
+      font-size: .78rem; color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      margin-top: .2rem;
+      min-height: 1.2em;
+    }
+    .step.active .step-desc { color: var(--amber); }
+
+    /* ── ETA bar ── */
+    .eta-bar {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 1rem 1.2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .eta-label { font-size: .78rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .eta-value { font-size: 1.6rem; font-weight: 900; color: var(--ink); font-family: 'DM Mono', monospace; }
+    .eta-unit  { font-size: .72rem; color: var(--muted); margin-left: .3rem; }
+
+    /* ── Preparing progress (自取用) ── */
+    .prep-section { display: none; }
+    .prep-section.visible { display: block; }
+    .progress-track {
+      background: var(--cream); border-radius: 100px;
+      height: 10px; overflow: hidden; margin-top: .8rem;
+    }
+    .progress-bar {
+      height: 100%; background: var(--amber);
+      border-radius: 100px;
+      width: 0%;
+      transition: width .5s ease;
+    }
+    .prep-label {
+      display: flex; justify-content: space-between;
+      font-family: 'DM Mono', monospace; font-size: .72rem;
+      color: var(--muted); margin-top: .4rem;
+    }
+
+    /* ── SVG Map ── */
+    .map-section { display: none; }
+    .map-section.visible { display: block; }
+
+    .map-wrap {
+      position: relative;
+      background: #e8e0d0;
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .map-svg {
+      width: 100%;
+      display: block;
+    }
+
+    /* street grid */
+    .road { fill: #d4c9b4; stroke: none; }
+    .road-mark { stroke: #bfb49f; stroke-width: 1; stroke-dasharray: 8,6; fill: none; }
+    .building { fill: #c8bfaf; rx: 2; }
+    .building-dark { fill: #b8afa0; }
+    .green-block { fill: #b8ceb0; }
+    .label-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px; fill: #8a7a65;
+      text-anchor: middle;
+    }
+
+    /* store marker */
+    .store-marker { filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+
+    /* dest marker */
+    .dest-marker { filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+
+    /* rider icon */
+    #rider {
+      transition: none;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.3));
+    }
+
+    /* pulse at store / dest */
+    .pulse-circle {
+      animation: map-pulse 1.5s ease-out infinite;
+      transform-origin: center;
+    }
+    @keyframes map-pulse {
+      0%   { r: 6; opacity: .8; }
+      100% { r: 18; opacity: 0; }
+    }
+
+    /* ── Done screen ── */
+    .done-screen {
+      display: none; text-align: center; padding: 2rem 1rem;
+    }
+    .done-screen.visible { display: block; }
+    .done-icon {
+      font-size: 4rem; display: block;
+      animation: pop .5s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes pop {
+      from { opacity:0; transform: scale(.4); }
+      to   { opacity:1; transform: scale(1); }
+    }
+    .done-title { font-size: 1.4rem; font-weight: 900; margin-top: .6rem; }
+    .done-desc  { font-size: .85rem; color: var(--muted); margin-top: .4rem; }
+    .back-btn {
+      display: inline-block; margin-top: 1.4rem;
+      padding: .75rem 2rem;
+      background: var(--ink); color: var(--paper);
+      border: none; cursor: pointer;
+      font-family: 'Noto Serif TC', serif;
+      font-size: .9rem; font-weight: 600;
+      letter-spacing: .1em; border-radius: 2px;
+      text-decoration: none;
+      transition: background .2s;
+    }
+    .back-btn:hover { background: var(--amber); }
+
+    /* ── Order summary ── */
+    .summary-row {
+      display: flex; justify-content: space-between;
+      font-size: .85rem; padding: .35rem 0;
+      border-bottom: 1px solid var(--cream);
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-name { color: var(--ink); }
+    .summary-price { font-family: 'DM Mono', monospace; color: var(--amber); }
+    .summary-total {
+      display: flex; justify-content: space-between;
+      font-weight: 900; font-size: 1rem;
+      padding-top: .7rem; margin-top: .4rem;
+      border-top: 2px solid var(--ink);
+    }
+    .summary-total .price { font-family: 'DM Mono', monospace; color: var(--rust); }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <header>
+    <span class="brand-icon">🧋</span>
+    <h1>珍珠奶茶屋</h1>
+    <div class="order-id-display" id="orderIdDisplay">載入中…</div>
+  </header>
+
+  <!-- ETA -->
+  <div class="eta-bar" id="etaBar">
+    <div>
+      <div class="eta-label">預計送達</div>
+      <div><span class="eta-value" id="etaValue">—</span><span class="eta-unit">分鐘</span></div>
+    </div>
+    <div style="font-size:1.8rem" id="etaIcon">🕐</div>
+  </div>
+
+  <!-- Status steps -->
+  <div class="section">
+    <div class="section-header">📋 訂單進度</div>
+    <div class="section-body">
+      <div class="steps" id="steps">
+
+        <div class="step" id="step-confirmed">
+          <div class="step-line"></div>
+          <div class="step-icon-wrap">✓</div>
+          <div class="step-content">
+            <div class="step-title">訂單確認</div>
+            <div class="step-desc" id="desc-confirmed"></div>
+          </div>
+        </div>
+
+        <div class="step" id="step-preparing">
+          <div class="step-line"></div>
+          <div class="step-icon-wrap">🏪</div>
+          <div class="step-content">
+            <div class="step-title">店家接收訂單</div>
+            <div class="step-desc" id="desc-preparing"></div>
+          </div>
+        </div>
+
+        <div class="step" id="step-delivering" id="step-delivering">
+          <div class="step-line"></div>
+          <div class="step-icon-wrap" id="icon-delivering">🛵</div>
+          <div class="step-content">
+            <div class="step-title" id="title-delivering">外送員送餐中</div>
+            <div class="step-desc" id="desc-delivering"></div>
+          </div>
+        </div>
+
+        <div class="step" id="step-done">
+          <div class="step-icon-wrap">🎉</div>
+          <div class="step-content">
+            <div class="step-title" id="title-done">完成訂單</div>
+            <div class="step-desc" id="desc-done"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 備餐進度（自取） -->
+  <div class="section prep-section" id="prepSection">
+    <div class="section-header">👨‍🍳 備餐進度</div>
+    <div class="section-body">
+      <div class="progress-track">
+        <div class="progress-bar" id="prepBar"></div>
+      </div>
+      <div class="prep-label">
+        <span>開始備餐</span>
+        <span id="prepPct">0%</span>
+        <span>取餐準備完成</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG Map（外送） -->
+  <div class="section map-section" id="mapSection">
+    <div class="section-header">🗺 外送路線</div>
+    <div class="section-body" style="padding:0">
+      <div class="map-wrap">
+        <svg class="map-svg" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" id="mapSvg">
+
+          <!-- Background -->
+          <rect width="400" height="300" fill="#ede6d8"/>
+
+          <!-- Roads horizontal -->
+          <rect x="0"   y="90"  width="400" height="28" class="road"/>
+          <rect x="0"   y="185" width="400" height="28" class="road"/>
+          <!-- Roads vertical -->
+          <rect x="75"  y="0"   width="28" height="300" class="road"/>
+          <rect x="185" y="0"   width="28" height="300" class="road"/>
+          <rect x="295" y="0"   width="28" height="300" class="road"/>
+
+          <!-- Road centre marks -->
+          <line x1="0" y1="104" x2="400" y2="104" class="road-mark"/>
+          <line x1="0" y1="199" x2="400" y2="199" class="road-mark"/>
+          <line x1="89"  y1="0" x2="89"  y2="300" class="road-mark"/>
+          <line x1="199" y1="0" x2="199" y2="300" class="road-mark"/>
+          <line x1="309" y1="0" x2="309" y2="300" class="road-mark"/>
+
+          <!-- Buildings block 1 (top-left) -->
+          <rect x="8"   y="8"   width="60" height="75" rx="2" class="building"/>
+          <rect x="14"  y="14"  width="25" height="30" rx="1" class="building-dark"/>
+          <rect x="44"  y="14"  width="18" height="30" rx="1" class="building-dark"/>
+          <rect x="14"  y="50"  width="48" height="28" rx="1" class="building-dark"/>
+
+          <!-- Block 2 (top-mid) -->
+          <rect x="110" y="8"   width="68" height="75" rx="2" class="building"/>
+          <rect x="116" y="14"  width="28" height="32" rx="1" class="building-dark"/>
+          <rect x="150" y="14"  width="22" height="32" rx="1" class="building-dark"/>
+          <rect x="116" y="52"  width="56" height="26" rx="1" class="building-dark"/>
+
+          <!-- Block 3 (top-right) -->
+          <rect x="220" y="8"   width="68" height="75" rx="2" class="green-block" opacity=".7"/>
+          <text x="254" y="48" class="label-text">公園</text>
+
+          <!-- Block 4 (top far-right) -->
+          <rect x="330" y="8"   width="62" height="75" rx="2" class="building"/>
+          <rect x="336" y="14"  width="24" height="34" rx="1" class="building-dark"/>
+          <rect x="366" y="14"  width="20" height="34" rx="1" class="building-dark"/>
+
+          <!-- Block 5 (mid-left) -->
+          <rect x="8"   y="125" width="60" height="53" rx="2" class="building"/>
+          <rect x="14"  y="131" width="48" height="40" rx="1" class="building-dark"/>
+
+          <!-- Block 6 (mid-mid) -->
+          <rect x="110" y="125" width="68" height="53" rx="2" class="building"/>
+          <rect x="116" y="131" width="26" height="40" rx="1" class="building-dark"/>
+          <rect x="148" y="131" width="24" height="40" rx="1" class="building-dark"/>
+
+          <!-- Block 7 (mid-right) -->
+          <rect x="220" y="125" width="68" height="53" rx="2" class="building"/>
+          <rect x="226" y="131" width="56" height="40" rx="1" class="building-dark"/>
+
+          <!-- Block 8 (mid far-right) -->
+          <rect x="330" y="125" width="62" height="53" rx="2" class="green-block" opacity=".6"/>
+          <text x="361" y="154" class="label-text">綠地</text>
+
+          <!-- Block 9 (bottom-left) -->
+          <rect x="8"   y="220" width="60" height="72" rx="2" class="building"/>
+          <rect x="14"  y="226" width="48" height="30" rx="1" class="building-dark"/>
+          <rect x="14"  y="260" width="22" height="26" rx="1" class="building-dark"/>
+          <rect x="40"  y="260" width="22" height="26" rx="1" class="building-dark"/>
+
+          <!-- Block 10 (bottom-mid) -->
+          <rect x="110" y="220" width="68" height="72" rx="2" class="building"/>
+          <rect x="116" y="226" width="56" height="28" rx="1" class="building-dark"/>
+          <rect x="116" y="260" width="56" height="26" rx="1" class="building-dark"/>
+
+          <!-- Block 11 (bottom-right) -->
+          <rect x="220" y="220" width="68" height="72" rx="2" class="building"/>
+          <rect x="226" y="226" width="26" height="60" rx="1" class="building-dark"/>
+          <rect x="258" y="226" width="24" height="60" rx="1" class="building-dark"/>
+
+          <!-- Block 12 (bottom far-right) -->
+          <rect x="330" y="220" width="62" height="72" rx="2" class="building"/>
+          <rect x="336" y="226" width="50" height="28" rx="1" class="building-dark"/>
+          <rect x="336" y="260" width="50" height="26" rx="1" class="building-dark"/>
+
+          <!-- Delivery route path (drawn as dashed, lit up progressively) -->
+          <path id="routePath"
+            d="M 89,104 H 199 V 199 H 309"
+            fill="none" stroke="var(--amber)" stroke-width="3"
+            stroke-dasharray="8,5" opacity=".35"/>
+          <path id="routePathDone"
+            d="M 89,104 H 199 V 199 H 309"
+            fill="none" stroke="var(--amber)" stroke-width="3"
+            stroke-dasharray="999" stroke-dashoffset="999"
+            opacity=".85"
+            style="transition: stroke-dashoffset 13s linear"/>
+
+          <!-- Store pulse -->
+          <circle id="storePulse" cx="89" cy="104" r="6" fill="var(--amber)" opacity="0" class="pulse-circle"/>
+
+          <!-- Store marker -->
+          <g class="store-marker" transform="translate(89,104)">
+            <circle r="10" fill="var(--amber)"/>
+            <text x="0" y="4" text-anchor="middle" font-size="10" fill="white">🏪</text>
+          </g>
+          <text x="89" y="80" class="label-text" font-weight="600" fill="var(--amber)">奶茶屋</text>
+
+          <!-- Dest pulse -->
+          <circle id="destPulse" cx="309" cy="199" r="6" fill="var(--rust)" opacity="0" class="pulse-circle"/>
+
+          <!-- Dest marker -->
+          <g class="dest-marker" transform="translate(309,199)">
+            <circle r="10" fill="var(--rust)"/>
+            <text x="0" y="4" text-anchor="middle" font-size="10" fill="white">📍</text>
+          </g>
+          <text x="309" y="225" class="label-text" fill="var(--rust)" id="destLabel">您的地址</text>
+
+          <!-- Rider (starts hidden at store) -->
+          <g id="rider" transform="translate(89,104)" opacity="0">
+            <circle r="13" fill="var(--ink)" opacity=".9"/>
+            <text x="0" y="5" text-anchor="middle" font-size="13">🛵</text>
+          </g>
+
+        </svg>
+      </div>
+      <div style="padding:.8rem 1.2rem; font-size:.75rem; font-family:'DM Mono',monospace; color:var(--muted); display:flex; gap:1.2rem;">
+        <span>🏪 珍珠奶茶屋</span>
+        <span>📍 <span id="mapAddrLabel">您的地址</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done screen -->
+  <div class="done-screen" id="doneScreen">
+    <span class="done-icon">🎉</span>
+    <div class="done-title" id="doneTitle">訂單完成！</div>
+    <div class="done-desc" id="doneDesc">感謝您的訂購，歡迎再次光臨 🧋</div>
+    <a href="/index.html" class="back-btn" id="backBtn">再來一杯</a>
+  </div>
+
+  <!-- Order summary -->
+  <div class="section" id="summarySection">
+    <div class="section-header">🧋 訂單明細</div>
+    <div class="section-body" id="summaryBody">
+      <div style="color:var(--muted); font-size:.85rem; font-family:'DM Mono',monospace">載入中…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ─────────────────────────────────
+   INIT — 從 URL 拿 orderId & mode
+───────────────────────────────── */
+const params      = new URLSearchParams(location.search);
+const orderId     = params.get('id')   || 'UNKNOWN';
+const mode        = params.get('mode') || 'delivery'; // delivery | pickup
+const address     = params.get('addr') || '您的地址';
+
+document.getElementById('orderIdDisplay').textContent = `訂單編號 ${orderId}`;
+document.getElementById('destLabel').textContent      = truncate(address, 10);
+document.getElementById('mapAddrLabel').textContent   = address;
+
+// 自取 → 調整步驟文字，隱藏外送步驟
+if (mode === 'pickup') {
+  document.getElementById('icon-delivering').textContent = '👨‍🍳';
+  document.getElementById('title-delivering').textContent = '備餐中';
+  document.getElementById('title-done').textContent = '可以取餐了！';
+  document.getElementById('etaIcon').textContent = '🏪';
+}
+
+/* API base（Live Server 相容） */
+const API_BASE = (() => {
+  const { protocol, hostname, port } = location;
+  if (protocol === 'file:') return 'http://localhost:3000';
+  if (port === '5500' || port === '5501') return `http://${hostname}:3000`;
+  return '';
+})();
+
+/* ─────────────────────────────────
+   STEP HELPERS
+───────────────────────────────── */
+const STEPS = ['confirmed', 'preparing', 'delivering', 'done'];
+
+const setStep = (stepId, state) => { // state: 'done' | 'active' | ''
+  const el = document.getElementById(`step-${stepId}`);
+  el.classList.remove('done', 'active');
+  if (state) el.classList.add(state);
+};
+
+const setDesc = (stepId, text) => {
+  const el = document.getElementById(`desc-${stepId}`);
+  if (el) el.textContent = text;
+};
+
+/* ─────────────────────────────────
+   ETA COUNTDOWN
+───────────────────────────────── */
+let etaMinutes = mode === 'delivery' ? 30 : 15;
+const etaEl    = document.getElementById('etaValue');
+etaEl.textContent = etaMinutes;
+
+const etaTimer = setInterval(() => {
+  if (etaMinutes > 0) etaMinutes--;
+  etaEl.textContent = etaMinutes;
+  if (etaMinutes === 0) clearInterval(etaTimer);
+}, 60_000);
+
+/* ─────────────────────────────────
+   SVG MAP ANIMATION
+───────────────────────────────── */
+// Route: store(89,104) → turn(199,104) → turn(199,199) → dest(309,199)
+// Total path length ≈ 110 + 95 + 110 = 315px in SVG coords
+// We animate across ~13 seconds
+
+const ROUTE = [
+  { x: 89,  y: 104 },   // store
+  { x: 199, y: 104 },   // turn 1
+  { x: 199, y: 199 },   // turn 2
+  { x: 309, y: 199 },   // dest
+];
+
+let riderAnimFrame = null;
+let riderStartTime = null;
+const RIDER_DURATION = 13000; // 13 seconds
+
+// Compute cumulative lengths for each segment
+const segLengths = [];
+let totalLen = 0;
+for (let i = 1; i < ROUTE.length; i++) {
+  const dx = ROUTE[i].x - ROUTE[i-1].x;
+  const dy = ROUTE[i].y - ROUTE[i-1].y;
+  const l  = Math.sqrt(dx*dx + dy*dy);
+  segLengths.push(l);
+  totalLen += l;
+}
+
+const getRiderPos = t => { // t: 0..1
+  let dist = t * totalLen;
+  for (let i = 0; i < segLengths.length; i++) {
+    if (dist <= segLengths[i]) {
+      const ratio = dist / segLengths[i];
+      return {
+        x: ROUTE[i].x + (ROUTE[i+1].x - ROUTE[i].x) * ratio,
+        y: ROUTE[i].y + (ROUTE[i+1].y - ROUTE[i].y) * ratio,
+      };
+    }
+    dist -= segLengths[i];
+  }
+  return ROUTE[ROUTE.length - 1];
+};
+
+const startRiderAnimation = (onDone) => {
+  const rider = document.getElementById('rider');
+  rider.setAttribute('opacity', '1');
+
+  // kick off route glow
+  document.getElementById('routePathDone').style.strokeDashoffset = '0';
+
+  const animate = (ts) => {
+    if (!riderStartTime) riderStartTime = ts;
+    const elapsed = ts - riderStartTime;
+    const t = Math.min(elapsed / RIDER_DURATION, 1);
+    const pos = getRiderPos(t);
+    rider.setAttribute('transform', `translate(${pos.x},${pos.y})`);
+
+    if (t < 1) {
+      riderAnimFrame = requestAnimationFrame(animate);
+    } else {
+      onDone();
+    }
+  };
+  riderAnimFrame = requestAnimationFrame(animate);
+};
+
+/* ─────────────────────────────────
+   PREP BAR ANIMATION (自取)
+───────────────────────────────── */
+let prepInterval = null;
+const startPrepBar = (durationMs, onDone) => {
+  document.getElementById('prepSection').classList.add('visible');
+  const bar  = document.getElementById('prepBar');
+  const pct  = document.getElementById('prepPct');
+  const step = 100 / (durationMs / 200);
+  let val = 0;
+  prepInterval = setInterval(() => {
+    val = Math.min(val + step, 100);
+    bar.style.width = val + '%';
+    pct.textContent = Math.round(val) + '%';
+    if (val >= 100) { clearInterval(prepInterval); onDone(); }
+  }, 200);
+};
+
+/* ─────────────────────────────────
+   STATUS MACHINE
+───────────────────────────────── */
+const now = () => new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+
+const handleStatus = (status) => {
+  switch (status) {
+
+    case 'confirmed':
+      setStep('confirmed', 'active');
+      setDesc('confirmed', `已收到您的訂單 ${now()}`);
+      document.getElementById('etaBar').style.display = 'flex';
+      break;
+
+    case 'preparing':
+      setStep('confirmed', 'done');
+      setStep('preparing', 'active');
+      setDesc('confirmed', `訂單確認 ${now()}`);
+      setDesc('preparing', mode === 'pickup' ? '店家正在備餐中…' : '店家已接單，開始備餐');
+
+      if (mode === 'pickup') {
+        startPrepBar(9000, () => {}); // 9 秒跑完（接著等 done 事件）
+      }
+      break;
+
+    case 'delivering':
+      setStep('preparing', 'done');
+      setStep('delivering', 'active');
+      setDesc('preparing', `店家接單 ${now()}`);
+
+      if (mode === 'delivery') {
+        setDesc('delivering', '外送員正在前往您的地址…');
+        document.getElementById('mapSection').classList.add('visible');
+        // pulse at store
+        document.getElementById('storePulse').style.opacity = '0.7';
+        setTimeout(() => {
+          document.getElementById('storePulse').style.opacity = '0';
+        }, 3000);
+
+        startRiderAnimation(() => {
+          // rider arrived — pulse at dest
+          document.getElementById('destPulse').style.opacity = '0.7';
+          setTimeout(() => document.getElementById('destPulse').style.opacity = '0', 3000);
+        });
+      } else {
+        setDesc('delivering', '備餐完成，請前往取餐');
+      }
+      break;
+
+    case 'done':
+      setStep('delivering', 'done');
+      setStep('done', 'active');
+      setDesc('delivering', mode === 'delivery' ? `送達 ${now()}` : `完成 ${now()}`);
+      setDesc('done', '感謝您的訂購 🎉');
+
+      etaEl.textContent = '0';
+      clearInterval(etaTimer);
+      document.getElementById('etaIcon').textContent = '✅';
+
+      // 短暫停後顯示完成畫面
+      setTimeout(() => {
+        setStep('done', 'done');
+        if (mode === 'pickup') {
+          document.getElementById('doneTitle').textContent = '可以取餐了！';
+          document.getElementById('doneDesc').textContent  = '請出示訂單編號取餐 🧋';
+        }
+        document.getElementById('doneScreen').classList.add('visible');
+      }, 1500);
+      break;
+  }
+};
+
+/* ─────────────────────────────────
+   ORDER SUMMARY
+───────────────────────────────── */
+const loadSummary = async () => {
+  try {
+    const res  = await fetch(`${API_BASE}/api/orders/${orderId}`);
+    const json = await res.json();
+    if (!json.success) return;
+    const order = json.order;
+    const body  = document.getElementById('summaryBody');
+    const rows  = (order.items || []).map(item => `
+      <div class="summary-row">
+        <span class="summary-name">${escHtml(item.name)} × ${item.qty}<br>
+          <small style="color:var(--muted);font-family:'DM Mono',monospace;font-size:.72rem">
+            ${item.size} · ${item.ice} · ${item.sugar}${item.toppingName ? ' · '+item.toppingName : ''}
+          </small>
+        </span>
+        <span class="summary-price">NT$ ${item.total}</span>
+      </div>
+    `).join('');
+    body.innerHTML = rows + `
+      <div class="summary-total">
+        <span>總計</span>
+        <span class="price">NT$ ${order.totalAmount}</span>
+      </div>`;
+  } catch {}
+};
+
+/* ─────────────────────────────────
+   SSE — 接收狀態更新
+───────────────────────────────── */
+const connectSSE = () => {
+  const es = new EventSource(`${API_BASE}/api/order-status/${orderId}`);
+
+  es.addEventListener('status', e => {
+    const data = JSON.parse(e.data);
+    handleStatus(data.status);
+  });
+
+  es.addEventListener('error', () => {
+    // SSE 斷線時靜默（server 完成後會關閉連線）
+    es.close();
+  });
+};
+
+/* ─────────────────────────────────
+   UTILS
+───────────────────────────────── */
+const escHtml = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+function truncate(str, max) {
+  return str.length > max ? str.slice(0, max) + '…' : str;
+}
+
+/* ─────────────────────────────────
+   BACK LINK
+───────────────────────────────── */
+// Live Server 相容
+if (location.port === '5500' || location.port === '5501') {
+  document.getElementById('backBtn').href = '/index.html';
+}
+
+/* ─────────────────────────────────
+   START
+───────────────────────────────── */
+handleStatus('confirmed'); // 立即顯示第一步
+loadSummary();
+connectSSE();
+</script>
+</body>
+</html>

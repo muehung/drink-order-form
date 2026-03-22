@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>訂單管理 — 珍珠奶茶屋</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1209;
+      --paper: #f5efe3;
+      --cream: #ede4d0;
+      --amber: #c8841a;
+      --rust: #b84c1e;
+      --sage: #5c7a5e;
+      --border: #c4b49a;
+      --error: #c0392b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'Noto Serif TC', serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .page-wrap { max-width: 900px; margin: 0 auto; }
+
+    /* Header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #3a2e1e;
+      margin-bottom: 2rem;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: .8rem; }
+    .brand h1 { font-size: 1.4rem; font-weight: 900; letter-spacing: .06em; }
+    .brand .sub {
+      font-size: .7rem; font-family: 'DM Mono', monospace;
+      color: var(--amber); letter-spacing: .15em;
+      display: block; margin-top: 2px;
+    }
+    .back-link {
+      font-size: .8rem; font-family: 'DM Mono', monospace;
+      color: #8a7a60; text-decoration: none;
+      border: 1px solid #3a2e1e; padding: .4rem .9rem; border-radius: 2px;
+      transition: all .2s;
+    }
+    .back-link:hover { color: var(--amber); border-color: var(--amber); }
+
+    /* Stats bar */
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem; margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: #231a0e; border: 1px solid #3a2e1e;
+      border-radius: 2px; padding: 1.2rem 1.4rem;
+    }
+    .stat-card .num {
+      font-size: 2rem; font-weight: 900;
+      font-family: 'DM Mono', monospace;
+      color: var(--amber);
+    }
+    .stat-card .label {
+      font-size: .72rem; color: #8a7a60;
+      letter-spacing: .1em; margin-top: .3rem;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: .8rem; margin-bottom: 1.5rem;
+      flex-wrap: wrap; align-items: center;
+    }
+    .filter-bar input, .filter-bar select {
+      background: #231a0e; color: var(--paper);
+      border: 1px solid #3a2e1e; border-radius: 2px;
+      padding: .55rem .9rem;
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+      outline: none; transition: border-color .2s;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+      border-color: var(--amber);
+    }
+    .filter-bar select option { background: #231a0e; }
+    .refresh-btn {
+      background: var(--amber); color: #fff;
+      border: none; cursor: pointer;
+      padding: .55rem 1.2rem; border-radius: 2px;
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+      transition: opacity .2s;
+    }
+    .refresh-btn:hover { opacity: .85; }
+
+    /* Loading / Empty */
+    .status-msg {
+      text-align: center; padding: 3rem;
+      color: #5a4a30; font-family: 'DM Mono', monospace;
+      font-size: .9rem;
+    }
+
+    /* Order cards */
+    .orders-list { display: flex; flex-direction: column; gap: 1rem; }
+
+    .order-card {
+      background: #231a0e;
+      border: 1px solid #3a2e1e;
+      border-radius: 2px;
+      overflow: hidden;
+      animation: fadeIn .3s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    .order-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .9rem 1.2rem;
+      background: #1a1209;
+      cursor: pointer;
+      user-select: none;
+      gap: .8rem; flex-wrap: wrap;
+    }
+    .order-head:hover { background: #2a1e0e; }
+
+    .order-id {
+      font-family: 'DM Mono', monospace;
+      font-size: .85rem; color: var(--amber); font-weight: 500;
+    }
+    .order-name { font-size: .9rem; font-weight: 600; }
+    .order-time {
+      font-family: 'DM Mono', monospace;
+      font-size: .72rem; color: #5a4a30; margin-left: auto;
+    }
+    .mode-badge {
+      font-size: .65rem; font-family: 'DM Mono', monospace;
+      padding: 2px 8px; border-radius: 2px;
+    }
+    .mode-delivery { background: #2a4a2e; color: #7ec882; }
+    .mode-pickup   { background: #2a2a4a; color: #8282e8; }
+    .chevron {
+      color: #5a4a30; font-size: .8rem;
+      transition: transform .25s;
+      flex-shrink: 0;
+    }
+    .order-card.open .chevron { transform: rotate(180deg); }
+
+    .order-body {
+      display: none;
+      padding: 1.2rem;
+      border-top: 1px solid #3a2e1e;
+    }
+    .order-card.open .order-body { display: block; }
+
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: .6rem 1.5rem; margin-bottom: 1.2rem;
+    }
+    @media (max-width: 480px) { .info-grid { grid-template-columns: 1fr; } }
+
+    .info-row .info-label {
+      font-size: .68rem; color: #5a4a30;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .08em; margin-bottom: .15rem;
+    }
+    .info-row .info-val { font-size: .88rem; }
+
+    .items-title {
+      font-size: .72rem; color: #5a4a30;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .1em; margin-bottom: .6rem;
+    }
+    .item-line {
+      display: flex; justify-content: space-between;
+      padding: .45rem 0;
+      border-bottom: 1px solid #2a2018;
+      font-size: .85rem; gap: .5rem;
+    }
+    .item-line:last-of-type { border-bottom: none; }
+    .item-line .item-spec {
+      font-size: .72rem; color: #5a4a30;
+      font-family: 'DM Mono', monospace;
+      margin-top: .1rem;
+    }
+    .item-line .item-total {
+      font-family: 'DM Mono', monospace;
+      color: var(--amber); white-space: nowrap;
+    }
+
+    .order-total-row {
+      display: flex; justify-content: space-between;
+      padding-top: .8rem; margin-top: .5rem;
+      border-top: 1px solid #5a4a30;
+      font-weight: 900;
+    }
+    .order-total-row .total-price {
+      font-family: 'DM Mono', monospace;
+      color: var(--rust); font-size: 1.05rem;
+    }
+
+    .note-box {
+      margin-top: .8rem; padding: .6rem .8rem;
+      background: #1a1209; border-radius: 2px;
+      border-left: 2px solid var(--amber);
+      font-size: .8rem; color: #a89070;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex; justify-content: center; align-items: center;
+      gap: .8rem; margin-top: 2rem;
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+    }
+    .page-btn {
+      background: #231a0e; color: var(--paper);
+      border: 1px solid #3a2e1e; cursor: pointer;
+      padding: .45rem .9rem; border-radius: 2px;
+      transition: all .2s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+    .page-btn:disabled { opacity: .3; cursor: not-allowed; }
+    .page-info { color: #5a4a30; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #3a2e1e; color: var(--paper);
+      padding: .7rem 1.4rem; border-radius: 2px;
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+      transition: transform .3s ease; white-space: nowrap;
+      border: 1px solid var(--border);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="page-wrap">
+
+  <header>
+    <div class="brand">
+      <span style="font-size:1.8rem">🧋</span>
+      <div>
+        <h1>訂單管理</h1>
+        <span class="sub">ORDER DASHBOARD</span>
+      </div>
+    </div>
+    <a href="/" class="back-link">← 回訂單頁</a>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num" id="statTotal">—</div>
+      <div class="label">總訂單數</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statToday">—</div>
+      <div class="label">今日訂單</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statRevenue">—</div>
+      <div class="label">今日營業額 NT$</div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <input type="date" id="filterDate" title="依日期篩選" />
+    <select id="filterMode">
+      <option value="">全部取餐方式</option>
+      <option value="delivery">外送</option>
+      <option value="pickup">自取</option>
+    </select>
+    <button class="refresh-btn" id="refreshBtn">⟳ 重新整理</button>
+  </div>
+
+  <!-- List -->
+  <div id="ordersList">
+    <div class="status-msg">載入中…</div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination" style="display:none">
+    <button class="page-btn" id="prevBtn">← 上一頁</button>
+    <span class="page-info" id="pageInfo"></span>
+    <button class="page-btn" id="nextBtn">下一頁 →</button>
+  </div>
+
+</div>
+
+<script>
+const LIMIT = 10;
+let offset = 0;
+let totalCount = 0;
+
+const fmt = iso => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ` +
+         `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+};
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
+/* ── Fetch orders ── */
+const fetchOrders = async () => {
+  const date   = document.getElementById('filterDate').value;
+  const mode   = document.getElementById('filterMode').value;
+  const params = new URLSearchParams({ limit: LIMIT, offset });
+  if (date) params.set('date', date);
+  if (mode) params.set('mode', mode);
+
+  try {
+    const res  = await fetch(`/api/orders?${params}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message);
+    totalCount = json.total;
+    renderOrders(json.orders);
+    renderPagination();
+    await fetchStats();
+  } catch (e) {
+    document.getElementById('ordersList').innerHTML =
+      `<div class="status-msg">⚠️ 無法連線到伺服器<br><small style="color:#5a4a30">請確認 node server.js 已啟動</small></div>`;
+  }
+};
+
+/* ── Stats ── */
+const fetchStats = async () => {
+  try {
+    const res  = await fetch(`/api/orders?date=${todayStr()}&limit=100`);
+    const json = await res.json();
+    const todayOrders = json.orders || [];
+
+    // 總數要從不帶 filter 的查詢拿
+    const allRes  = await fetch('/api/orders?limit=1');
+    const allJson = await allRes.json();
+
+    document.getElementById('statTotal').textContent   = allJson.total ?? '—';
+    document.getElementById('statToday').textContent   = json.total ?? 0;
+    document.getElementById('statRevenue').textContent =
+      todayOrders.reduce((s, o) => s + (o.totalAmount || 0), 0).toLocaleString();
+  } catch {}
+};
+
+/* ── Render ── */
+const renderOrders = orders => {
+  const el = document.getElementById('ordersList');
+  if (!orders.length) {
+    el.innerHTML = '<div class="status-msg">沒有符合條件的訂單 🫙</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'orders-list';
+
+  orders.forEach(o => {
+    const card = document.createElement('div');
+    card.className = 'order-card';
+
+    const modeBadge = o.deliveryMode === 'delivery'
+      ? '<span class="mode-badge mode-delivery">🛵 外送</span>'
+      : '<span class="mode-badge mode-pickup">🏪 自取</span>';
+
+    // Head
+    const head = document.createElement('div');
+    head.className = 'order-head';
+    head.innerHTML = `
+      <span class="order-id">${o.orderId}</span>
+      <span class="order-name">${escHtml(o.customer?.name || '—')}</span>
+      ${modeBadge}
+      <span class="order-time">${fmt(o.createdAt)}</span>
+      <span class="chevron">▼</span>
+    `;
+    head.addEventListener('click', () => card.classList.toggle('open'));
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'order-body';
+
+    const itemsHtml = (o.items || []).map(item => `
+      <div class="item-line">
+        <div>
+          <div>${escHtml(item.name)} × ${item.qty}</div>
+          <div class="item-spec">${item.size} · ${item.ice} · ${item.sugar}${item.toppingName ? ' · ' + item.toppingName : ''}</div>
+        </div>
+        <span class="item-total">NT$ ${item.total}</span>
+      </div>
+    `).join('');
+
+    const noteHtml = o.customer?.note
+      ? `<div class="note-box">📝 ${escHtml(o.customer.note)}</div>` : '';
+
+    body.innerHTML = `
+      <div class="info-grid">
+        <div class="info-row">
+          <div class="info-label">姓名</div>
+          <div class="info-val">${escHtml(o.customer?.name || '—')}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">電話</div>
+          <div class="info-val" style="font-family:'DM Mono',monospace">${escHtml(o.customer?.phone || '—')}</div>
+        </div>
+        <div class="info-row" style="grid-column:1/-1">
+          <div class="info-label">地址／取餐</div>
+          <div class="info-val">${escHtml(o.customer?.address || '—')}</div>
+        </div>
+      </div>
+      <div class="items-title">ITEMS</div>
+      ${itemsHtml}
+      <div class="order-total-row">
+        <span>總計</span>
+        <span class="total-price">NT$ ${o.totalAmount}</span>
+      </div>
+      ${noteHtml}
+    `;
+
+    card.appendChild(head);
+    card.appendChild(body);
+    list.appendChild(card);
+  });
+
+  el.appendChild(list);
+};
+
+const renderPagination = () => {
+  const pg = document.getElementById('pagination');
+  if (totalCount <= LIMIT) { pg.style.display = 'none'; return; }
+  pg.style.display = 'flex';
+
+  const currentPage = Math.floor(offset / LIMIT) + 1;
+  const totalPages  = Math.ceil(totalCount / LIMIT);
+  document.getElementById('pageInfo').textContent = `第 ${currentPage} / ${totalPages} 頁`;
+  document.getElementById('prevBtn').disabled = offset === 0;
+  document.getElementById('nextBtn').disabled = offset + LIMIT >= totalCount;
+};
+
+/* ── Utils ── */
+const escHtml = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+let toastT;
+const showToast = msg => {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2500);
+};
+
+/* ── Event wiring ── */
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  offset = 0; fetchOrders(); showToast('已重新整理');
+});
+document.getElementById('filterDate').addEventListener('change', () => { offset = 0; fetchOrders(); });
+document.getElementById('filterMode').addEventListener('change', () => { offset = 0; fetchOrders(); });
+document.getElementById('prevBtn').addEventListener('click', () => {
+  offset = Math.max(0, offset - LIMIT); fetchOrders();
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  offset += LIMIT; fetchOrders();
+});
+
+/* ── Init: 預設帶今天日期 ── */
+document.getElementById('filterDate').value = todayStr();
+fetchOrders();
+
+// 每 30 秒自動重整
+setInterval(fetchOrders, 30_000);
+</script>
+</body>
+</html>

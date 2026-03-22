@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="no-referrer" />
+  <title>珍珠奶茶屋 × 訂單系統</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1209;
+      --paper: #f5efe3;
+      --cream: #ede4d0;
+      --amber: #c8841a;
+      --amber-light: #e8a83a;
+      --rust: #b84c1e;
+      --sage: #5c7a5e;
+      --error: #c0392b;
+      --success: #27ae60;
+      --border: #c4b49a;
+      --shadow: rgba(26,18,9,0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Noto Serif TC', serif;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(200,132,26,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(184,76,30,0.05) 0%, transparent 50%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23c4b49a' opacity='0.3'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page-wrap {
+      position: relative; z-index: 1;
+      max-width: 680px; margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 3rem 0 2.5rem;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+    header::after {
+      content: '✦  珍選好茶  ✦';
+      display: block;
+      font-size: .7rem;
+      letter-spacing: .35em;
+      color: var(--amber);
+      margin-top: .6rem;
+      font-family: 'DM Mono', monospace;
+    }
+    .brand-icon {
+      font-size: 3rem;
+      line-height: 1;
+      margin-bottom: .5rem;
+      display: block;
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    h1 { font-size: 2.2rem; font-weight: 900; letter-spacing: .04em; }
+    .subtitle { font-size: .85rem; color: #7a6a50; margin-top: .4rem; letter-spacing: .1em; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; top: 1.5rem; right: 1.5rem; z-index: 999;
+      padding: .85rem 1.4rem;
+      border-radius: 4px;
+      font-size: .9rem;
+      font-family: 'DM Mono', monospace;
+      box-shadow: 0 4px 20px var(--shadow);
+      transform: translateX(120%);
+      transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+      max-width: 320px;
+    }
+    #toast.show { transform: translateX(0); }
+    #toast.success { background: var(--sage); color: #fff; }
+    #toast.error { background: var(--rust); color: #fff; }
+
+    /* ── Cart Badge ── */
+    .cart-btn {
+      position: fixed; bottom: 2rem; right: 2rem; z-index: 99;
+      background: var(--amber);
+      color: #fff;
+      border: none; cursor: pointer;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 16px rgba(200,132,26,.4);
+      transition: transform .2s, box-shadow .2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-btn > * { pointer-events: none; }
+    .cart-btn:hover { transform: scale(1.1); box-shadow: 0 6px 22px rgba(200,132,26,.5); }
+    .cart-badge {
+      position: absolute; top: -4px; right: -4px;
+      background: var(--rust); color: #fff;
+      font-size: .65rem; font-family: 'DM Mono', monospace;
+      min-width: 20px; height: 20px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px;
+      opacity: 0; transform: scale(0);
+      transition: all .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    .cart-badge.visible { opacity: 1; transform: scale(1); }
+
+    /* ── Section ── */
+    .section {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      margin-bottom: 1.8rem;
+      box-shadow: 3px 3px 0 var(--cream);
+      overflow: hidden;
+      animation: slideUp .5s ease both;
+    }
+    @keyframes slideUp {
+      from { opacity:0; transform: translateY(18px); }
+      to { opacity:1; transform: translateY(0); }
+    }
+    .section:nth-child(2) { animation-delay: .05s; }
+    .section:nth-child(3) { animation-delay: .1s; }
+    .section:nth-child(4) { animation-delay: .15s; }
+    .section:nth-child(5) { animation-delay: .2s; }
+
+    .section-header {
+      padding: 1.1rem 1.6rem;
+      background: var(--ink);
+      color: var(--paper);
+      display: flex; align-items: center; gap: .7rem;
+      font-weight: 600; font-size: .95rem; letter-spacing: .08em;
+    }
+    .section-header .tag {
+      background: var(--amber);
+      color: #fff;
+      font-size: .65rem;
+      font-family: 'DM Mono', monospace;
+      padding: 2px 8px;
+      border-radius: 2px;
+      letter-spacing: .06em;
+    }
+    .section-body { padding: 1.6rem; }
+
+    /* ── Form Fields ── */
+    .field { margin-bottom: 1.3rem; }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: .8rem;
+      letter-spacing: .12em;
+      color: #7a6a50;
+      margin-bottom: .45rem;
+      font-weight: 600;
+    }
+    label .req { color: var(--rust); margin-left: 2px; }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="number"],
+    select, textarea {
+      width: 100%;
+      padding: .75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Noto Serif TC', serif;
+      font-size: .95rem;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(200,132,26,.15);
+    }
+    input.invalid, select.invalid, textarea.invalid {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(192,57,43,.1);
+      animation: shake .35s ease;
+    }
+    input.valid { border-color: var(--success); }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .field-error {
+      font-size: .75rem;
+      color: var(--error);
+      margin-top: .3rem;
+      font-family: 'DM Mono', monospace;
+      display: none;
+    }
+    .field-error.show { display: block; }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 480px) { .row-2 { grid-template-columns: 1fr; } }
+
+    /* ── Menu Grid ── */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: .8rem;
+    }
+    .menu-item {
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      padding: .9rem .8rem;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      background: var(--paper);
+      text-align: center;
+      user-select: none;
+    }
+    .menu-item:hover { border-color: var(--amber); transform: translateY(-2px); }
+    .menu-item.selected {
+      border-color: var(--amber);
+      background: #fdf6e8;
+      box-shadow: 0 0 0 3px rgba(200,132,26,.2);
+    }
+    .menu-item .item-emoji { font-size: 1.8rem; display: block; margin-bottom: .3rem; }
+    .menu-item .item-name { font-size: .82rem; font-weight: 600; color: var(--ink); }
+    .menu-item .item-price {
+      font-size: .75rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--amber);
+      margin-top: .2rem;
+    }
+    .menu-item .check {
+      position: absolute; top: 6px; right: 6px;
+      width: 18px; height: 18px;
+      background: var(--amber); color: #fff;
+      border-radius: 50%;
+      font-size: .7rem;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: scale(0);
+      transition: all .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    .menu-item.selected .check { opacity: 1; transform: scale(1); }
+
+    /* ── Options ── */
+    .option-chips {
+      display: flex; flex-wrap: wrap; gap: .5rem;
+    }
+    .chip {
+      padding: .4rem .9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      font-size: .8rem;
+      cursor: pointer;
+      transition: all .18s;
+      background: var(--paper);
+      font-family: 'DM Mono', monospace;
+      color: #5a4a30;
+    }
+    .chip:hover { border-color: var(--amber); color: var(--amber); }
+    .chip.active {
+      background: var(--amber); border-color: var(--amber);
+      color: #fff; font-weight: 500;
+    }
+    .chip.disabled {
+      opacity: .35; cursor: not-allowed;
+      border-style: dashed;
+      pointer-events: none;
+    }
+    select.no-topping {
+      opacity: .45; cursor: not-allowed;
+    }
+    /* 規則提示標籤 */
+    .rule-hint {
+      font-size: .72rem; font-family: 'DM Mono', monospace;
+      color: var(--amber); margin-top: .4rem;
+      min-height: 1.2em;
+      transition: opacity .2s;
+    }
+
+    /* ── Cart Summary ── */
+    .cart-summary {
+      border: 1.5px dashed var(--border);
+      border-radius: 2px;
+      padding: 1.2rem;
+      background: var(--cream);
+      min-height: 80px;
+    }
+    .cart-empty {
+      text-align: center; color: #a89070;
+      font-size: .85rem; padding: 1rem 0;
+      font-family: 'DM Mono', monospace;
+    }
+    .cart-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .88rem;
+      animation: fadeIn .25s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .cart-row:last-of-type { border-bottom: none; }
+    .cart-row .item-label { flex:1; }
+    .cart-row .item-meta { font-size: .72rem; color: #8a7a60; font-family: 'DM Mono', monospace; }
+    .cart-row .item-price-tag { font-family: 'DM Mono', monospace; color: var(--amber); margin: 0 .8rem; }
+    .remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: #c0a080; font-size: .85rem;
+      padding: 2px 6px; border-radius: 2px;
+      transition: color .15s;
+    }
+    .remove-btn:hover { color: var(--rust); }
+    .cart-total {
+      display: flex; justify-content: space-between;
+      padding-top: .8rem; margin-top: .5rem;
+      border-top: 2px solid var(--ink);
+      font-weight: 900; font-size: 1.05rem;
+    }
+    .cart-total .price { font-family: 'DM Mono', monospace; color: var(--rust); }
+
+    /* ── Delivery Toggle ── */
+    .toggle-group {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .6rem;
+    }
+    .toggle-btn {
+      padding: .8rem;
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      background: var(--paper);
+      cursor: pointer;
+      text-align: center;
+      font-family: 'Noto Serif TC', serif;
+      font-size: .88rem;
+      transition: all .2s;
+      color: var(--ink);
+    }
+    .toggle-btn:hover { border-color: var(--amber); }
+    .toggle-btn.active {
+      background: var(--ink); color: var(--paper);
+      border-color: var(--ink);
+    }
+
+    /* ── Submit ── */
+    .submit-btn {
+      width: 100%;
+      padding: 1.1rem;
+      background: var(--ink);
+      color: var(--paper);
+      border: none; cursor: pointer;
+      font-family: 'Noto Serif TC', serif;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: .15em;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+      transition: background .2s;
+    }
+    .submit-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--amber);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform .35s ease;
+      z-index: 0;
+    }
+    .submit-btn:hover::before { transform: scaleX(1); }
+    .submit-btn span { position: relative; z-index: 1; pointer-events: none; }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .submit-btn.loading span::after {
+      content: ' ⌛';
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+    /* ── Rate Limit Notice ── */
+    .rate-notice {
+      font-size: .72rem;
+      color: #a89070;
+      text-align: center;
+      margin-top: .6rem;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── Saved Indicator ── */
+    .saved-dot {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .72rem; color: var(--sage);
+      font-family: 'DM Mono', monospace;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+    .saved-dot.visible { opacity: 1; }
+    .saved-dot::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--sage);
+      border-radius: 50%;
+      animation: blink 1.5s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.2;} }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 1rem;
+      color: var(--border); font-size: .72rem;
+      font-family: 'DM Mono', monospace;
+      margin: .8rem 0;
+    }
+    .divider::before, .divider::after {
+      content:''; flex:1; height: 1px; background: var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- Cart FAB -->
+<button class="cart-btn" id="cartFab" title="查看購物車">
+  🧋
+  <span class="cart-badge" id="cartBadge">0</span>
+</button>
+
+<div class="page-wrap">
+
+  <header>
+    <span class="brand-icon">🧋</span>
+    <h1>珍珠奶茶屋</h1>
+    <p class="subtitle">BOBA HOUSE × ORDER SYSTEM</p>
+  </header>
+
+  <!-- 1. 顧客資訊 -->
+  <div class="section">
+    <div class="section-header">
+      <span>👤</span> 顧客資訊
+      <span class="tag">CUSTOMER</span>
+      <span class="saved-dot" id="savedDot">已自動儲存</span>
+    </div>
+    <div class="section-body">
+      <div class="row-2">
+        <div class="field">
+          <label>姓名 <span class="req">*</span></label>
+          <input type="text" id="name" placeholder="王小明" maxlength="30" autocomplete="off" />
+          <div class="field-error" id="nameError">請輸入真實姓名（2–30字）</div>
+        </div>
+        <div class="field">
+          <label>電話 <span class="req">*</span></label>
+          <input type="tel" id="phone" placeholder="09XX-XXX-XXX" maxlength="20" autocomplete="off" />
+          <div class="field-error" id="phoneError">請輸入有效台灣手機號碼</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>備註（過敏原、特殊要求）</label>
+        <textarea id="note" placeholder="例：對花生過敏、請多給吸管…" maxlength="200"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 取餐方式 -->
+  <div class="section">
+    <div class="section-header">
+      <span>🛵</span> 取餐方式
+      <span class="tag">DELIVERY</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-mode="delivery" id="btnDelivery">🛵 外送到府</button>
+        <button class="toggle-btn" data-mode="pickup" id="btnPickup">🏪 自取</button>
+      </div>
+      <div class="field" id="addressField" style="margin-top:1.2rem;">
+        <label>外送地址 <span class="req">*</span></label>
+        <input type="text" id="address" placeholder="台北市信義區信義路五段7號" maxlength="100" />
+        <div class="field-error" id="addressError">請輸入完整地址（至少10字）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 選擇飲料 -->
+  <div class="section">
+    <div class="section-header">
+      <span>🍵</span> 選擇飲料
+      <span class="tag">MENU</span>
+    </div>
+    <div class="section-body">
+      <div class="menu-grid" id="menuGrid"></div>
+    </div>
+  </div>
+
+  <!-- 4. 規格選擇 -->
+  <div class="section">
+    <div class="section-header">
+      <span>⚙️</span> 規格選擇
+      <span class="tag">OPTIONS</span>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label>冰塊</label>
+        <div class="option-chips" id="iceChips">
+          <span class="chip active" data-val="正常冰">正常冰</span>
+          <span class="chip" data-val="少冰">少冰</span>
+          <span class="chip" data-val="微冰">微冰</span>
+          <span class="chip" data-val="去冰">去冰</span>
+          <span class="chip" data-val="熱飲">熱飲</span>
+        </div>
+      </div>
+      <div class="divider">SWEETNESS</div>
+      <div class="field">
+        <label>甜度</label>
+        <div class="option-chips" id="sugarChips">
+          <span class="chip" data-val="全糖">全糖</span>
+          <span class="chip active" data-val="七分糖">七分糖</span>
+          <span class="chip" data-val="半糖">半糖</span>
+          <span class="chip" data-val="三分糖">三分糖</span>
+          <span class="chip" data-val="無糖">無糖</span>
+        </div>
+        <div class="rule-hint" id="sugarHint"></div>
+      </div>
+      <div class="divider">SIZE & TOPPINGS</div>
+      <div class="row-2">
+        <div class="field">
+          <label>尺寸</label>
+          <select id="sizeSelect">
+            <option value="M">M 中杯 (+$0)</option>
+            <option value="L" selected>L 大杯 (+$10)</option>
+            <option value="XL">XL 超大杯 (+$20)</option>
+          </select>
+          <div class="rule-hint" id="sizeHint"></div>
+        </div>
+        <div class="field">
+          <label>加料</label>
+          <select id="toppingSelect">
+            <option value="none">不加料</option>
+            <option value="pearl">珍珠 (+$15)</option>
+            <option value="jelly">椰果 (+$10)</option>
+            <option value="pudding">布丁 (+$15)</option>
+            <option value="grass_jelly">仙草 (+$10)</option>
+          </select>
+          <div class="rule-hint" id="toppingHint"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>數量</label>
+        <input type="number" id="qty" value="1" min="1" max="20" />
+        <div class="field-error" id="qtyError">數量需在 1–20 之間</div>
+      </div>
+      <button class="toggle-btn" id="addToCartBtn" style="width:100%; margin-top:.5rem; padding:.9rem; font-size:.9rem;">
+        ＋ 加入購物車
+      </button>
+    </div>
+  </div>
+
+  <!-- 5. 購物車 -->
+  <div class="section" id="cartSection">
+    <div class="section-header">
+      <span>🛒</span> 購物車
+      <span class="tag">CART</span>
+    </div>
+    <div class="section-body">
+      <div class="cart-summary" id="cartSummary">
+        <div class="cart-empty">尚未加入任何飲料 ☕</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <button class="submit-btn" id="submitBtn">
+    <span>確認送出訂單</span>
+  </button>
+  <div class="rate-notice" id="rateLimitMsg"></div>
+
+</div>
+
+<script>
+/* ─────────────────────────────────
+   API BASE URL 自動偵測
+   - 從 Node server (port 3000) 開 → 相對路徑
+   - 從 Live Server (port 5500) 開 → 指向 localhost:3000
+───────────────────────────────── */
+const API_BASE = (() => {
+  const { protocol, hostname, port } = location;
+  if (protocol === 'file:') return '';           // file:// → 模擬模式（無法跨 origin）
+  if (port === '5500' || port === '5501')        // VS Code Live Server
+    return `http://${hostname}:3000`;
+  return '';                                      // 同 port（node server.js）→ 相對路徑
+})();
+
+/* ─────────────────────────────────
+   SECURITY HELPERS
+───────────────────────────────── */
+const escapeHtml = str => String(str)
+  .replace(/&/g,'&amp;')
+  .replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;')
+  .replace(/'/g,'&#39;');
+
+const sanitizeText = (str, max) =>
+  String(str).replace(/[<>"'`]/g, '').trim().substring(0, max);
+
+/* Session token: random hex for idempotency */
+const getSessionToken = () => {
+  let t = sessionStorage.getItem('_boba_tok');
+  if (!t) {
+    t = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2,'0')).join('');
+    sessionStorage.setItem('_boba_tok', t);
+  }
+  return t;
+};
+
+/* Rate limiter — max 3 submits per 30s */
+const RATE_KEY = '_boba_rl';
+const canSubmit = () => {
+  const now = Date.now();
+  let rl = JSON.parse(localStorage.getItem(RATE_KEY) || '[]');
+  rl = rl.filter(t => now - t < 30000);
+  if (rl.length >= 3) return false;
+  rl.push(now);
+  localStorage.setItem(RATE_KEY, JSON.stringify(rl));
+  return true;
+};
+const nextAvailable = () => {
+  const now = Date.now();
+  let rl = JSON.parse(localStorage.getItem(RATE_KEY) || '[]');
+  rl = rl.filter(t => now - t < 30000);
+  if (!rl.length) return 0;
+  return Math.ceil((30000 - (now - Math.min(...rl))) / 1000);
+};
+
+/* ─────────────────────────────────
+   MENU DATA
+───────────────────────────────── */
+const MENU = [
+  { id:'bbt',   emoji:'🧋', name:'珍珠奶茶',   price:70 },
+  { id:'mgt',   emoji:'🍵', name:'抹茶拿鐵',   price:80 },
+  { id:'taro',  emoji:'🟣', name:'芋頭奶茶',   price:75 },
+  { id:'brown', emoji:'🤎', name:'黑糖鮮奶茶', price:85 },
+  { id:'mango', emoji:'🥭', name:'芒果冰沙',   price:90 },
+  { id:'lemon', emoji:'🍋', name:'檸檬綠茶',   price:65 },
+  { id:'pass',  emoji:'🏝️', name:'百香雙響炮', price:75 },
+  { id:'oolong',emoji:'🍃', name:'四季春烏龍', price:60 },
+];
+const TOPPING_PRICE = { none:0, pearl:15, jelly:10, pudding:15, grass_jelly:10 };
+const SIZE_PRICE     = { M:0, L:10, XL:20 };
+
+let selectedDrink = null;
+let deliveryMode = 'delivery';
+let iceChoice = '正常冰';
+let sugarChoice = '七分糖';
+let cart = [];
+
+/* ─────────────────────────────────
+   LOCALSTORAGE (Base64 encode)
+───────────────────────────────── */
+const LS_FORM = '_boba_form';
+const LS_CART = '_boba_cart';
+
+const lsSave = (key, data) => {
+  try {
+    localStorage.setItem(key, btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
+  } catch(e) {}
+};
+const lsLoad = key => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(decodeURIComponent(escape(atob(raw))));
+  } catch(e) { localStorage.removeItem(key); return null; }
+};
+
+const saveForm = () => {
+  const data = {
+    name: sanitizeText(document.getElementById('name').value, 30),
+    address: sanitizeText(document.getElementById('address').value, 100),
+    note: sanitizeText(document.getElementById('note').value, 200),
+    deliveryMode,
+  };
+  lsSave(LS_FORM, data);
+  const dot = document.getElementById('savedDot');
+  dot.classList.add('visible');
+  setTimeout(() => dot.classList.remove('visible'), 2000);
+};
+
+const loadForm = () => {
+  const d = lsLoad(LS_FORM);
+  if (!d) return;
+  if (d.name)    document.getElementById('name').value = d.name;
+  if (d.address) document.getElementById('address').value = d.address;
+  if (d.note)    document.getElementById('note').value = d.note;
+  if (d.deliveryMode) setMode(d.deliveryMode, false);
+};
+
+const saveCart = () => lsSave(LS_CART, cart);
+const loadCart = () => {
+  const c = lsLoad(LS_CART);
+  if (Array.isArray(c)) { cart = c; renderCart(); }
+};
+
+/* Debounce auto-save */
+let saveTimer;
+const debounceSave = () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveForm, 800);
+};
+['name','phone','address','note'].forEach(id => {
+  document.getElementById(id).addEventListener('input', debounceSave);
+});
+
+/* ─────────────────────────────────
+   RENDER MENU
+───────────────────────────────── */
+const renderMenu = () => {
+  const grid = document.getElementById('menuGrid');
+  grid.innerHTML = MENU.map(item => `
+    <div class="menu-item ${selectedDrink?.id === item.id ? 'selected' : ''}" data-id="${item.id}">
+      <div class="check">✓</div>
+      <span class="item-emoji">${item.emoji}</span>
+      <div class="item-name">${escapeHtml(item.name)}</div>
+      <div class="item-price">NT$ ${item.price}</div>
+    </div>
+  `).join('');
+};
+
+/* Menu click via event delegation (no inline onclick) */
+document.getElementById('menuGrid').addEventListener('click', e => {
+  const item = e.target.closest('.menu-item');
+  if (!item) return;
+  selectedDrink = MENU.find(m => m.id === item.dataset.id) || null;
+  renderMenu();
+  applyDrinkRules();
+});
+
+/* ─────────────────────────────────
+   飲料規格連動規則
+   1. 只有四季春烏龍可選無糖
+   2. 熱飲不能選 XL
+   3. 芒果冰沙不能加料
+───────────────────────────────── */
+const applyDrinkRules = () => {
+  const id    = selectedDrink?.id || null;
+  const isHot = iceChoice === '熱飲';
+
+  // ── 規則 1：無糖只限四季春烏龍 ──
+  const allowNoSugar  = (id === 'oolong');
+  const noSugarChip   = document.querySelector('#sugarChips .chip[data-val="無糖"]');
+  noSugarChip.classList.toggle('disabled', !allowNoSugar);
+  document.getElementById('sugarHint').textContent =
+    !allowNoSugar && id ? '⚠ 無糖僅限四季春烏龍' : '';
+
+  // 已選無糖但換成不允許飲料 → 自動退回七分糖
+  if (!allowNoSugar && sugarChoice === '無糖') {
+    sugarChoice = '七分糖';
+    document.querySelectorAll('#sugarChips .chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.val === '七分糖')
+    );
+  }
+
+  // ── 規則 2：熱飲不能選 XL ──
+  const xlOption = document.querySelector('#sizeSelect option[value="XL"]');
+  xlOption.disabled     = isHot;
+  xlOption.textContent  = isHot ? 'XL 超大杯（熱飲不供應）' : 'XL 超大杯 (+$20)';
+  document.getElementById('sizeHint').textContent =
+    isHot ? '⚠ 熱飲無超大杯' : '';
+
+  // 熱飲時已選 XL → 退回 L
+  if (isHot && document.getElementById('sizeSelect').value === 'XL') {
+    document.getElementById('sizeSelect').value = 'L';
+  }
+
+  // ── 規則 3：芒果冰沙不能加料 ──
+  const noTopping     = (id === 'mango');
+  const toppingSelect = document.getElementById('toppingSelect');
+  Array.from(toppingSelect.options).forEach(opt => {
+    if (opt.value !== 'none') opt.disabled = noTopping;
+  });
+  toppingSelect.classList.toggle('no-topping', noTopping);
+  document.getElementById('toppingHint').textContent =
+    noTopping ? '⚠ 芒果冰沙不提供加料' : '';
+
+  if (noTopping) toppingSelect.value = 'none';
+};
+
+/* ─────────────────────────────────
+   CHIPS
+───────────────────────────────── */
+document.getElementById('iceChips').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  document.querySelectorAll('#iceChips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  iceChoice = chip.dataset.val;
+  applyDrinkRules(); // 冰塊換成熱飲時要重跑規則 2
+});
+document.getElementById('sugarChips').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip || chip.classList.contains('disabled')) return; // 擋掉 disabled
+  document.querySelectorAll('#sugarChips .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  sugarChoice = chip.dataset.val;
+});
+
+/* ─────────────────────────────────
+   DELIVERY MODE
+───────────────────────────────── */
+const setMode = (mode, save = true) => {
+  deliveryMode = mode;
+  document.querySelectorAll('.toggle-btn[data-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  const addrField = document.getElementById('addressField');
+  addrField.style.display = mode === 'delivery' ? 'block' : 'none';
+  if (save) saveForm();
+};
+
+document.getElementById('btnDelivery').addEventListener('click', () => setMode('delivery'));
+document.getElementById('btnPickup').addEventListener('click',   () => setMode('pickup'));
+
+/* ─────────────────────────────────
+   RESET SELECTIONS after add to cart
+───────────────────────────────── */
+const resetSelections = () => {
+  // 清除飲料選擇
+  selectedDrink = null;
+  renderMenu();
+  // 重置冰塊回「正常冰」
+  iceChoice = '正常冰';
+  document.querySelectorAll('#iceChips .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.val === '正常冰');
+  });
+  // 重置甜度回「七分糖」
+  sugarChoice = '七分糖';
+  document.querySelectorAll('#sugarChips .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.val === '七分糖');
+  });
+  // 重置尺寸、加料、數量
+  document.getElementById('sizeSelect').value   = 'L';
+  document.getElementById('toppingSelect').value = 'none';
+  document.getElementById('qty').value           = '1';
+  // 清空規格限制提示
+  applyDrinkRules();
+};
+
+/* ─────────────────────────────────
+   CART
+───────────────────────────────── */
+const addToCart = () => {
+  if (!selectedDrink) { showToast('請先選擇飲料', 'error'); return; }
+  const qty = parseInt(document.getElementById('qty').value);
+  if (!qty || qty < 1 || qty > 20) {
+    setFieldError('qty', 'qtyError', true);
+    showToast('數量需在 1–20 之間', 'error');
+    return;
+  }
+  setFieldError('qty', 'qtyError', false);
+
+  const size    = document.getElementById('sizeSelect').value;
+  const topping = document.getElementById('toppingSelect').value;
+  const unitPrice = selectedDrink.price + SIZE_PRICE[size] + TOPPING_PRICE[topping];
+  const toppingName = { none:'', pearl:'珍珠', jelly:'椰果', pudding:'布丁', grass_jelly:'仙草' }[topping];
+
+  const drinkName = selectedDrink.name; // capture before reset
+  cart.push({
+    id: selectedDrink.id, name: drinkName, emoji: selectedDrink.emoji,
+    size, topping, toppingName, ice: iceChoice, sugar: sugarChoice,
+    qty, unitPrice, total: unitPrice * qty
+  });
+
+  saveCart();
+  renderCart();
+  showToast(`已加入 ${drinkName} × ${qty}`, 'success');
+
+  // 加入後清空選擇
+  resetSelections();
+};
+
+document.getElementById('addToCartBtn').addEventListener('click', addToCart);
+
+const removeFromCart = idx => {
+  cart.splice(idx, 1);
+  saveCart();
+  renderCart();
+};
+
+const renderCart = () => {
+  const el    = document.getElementById('cartSummary');
+  const badge = document.getElementById('cartBadge');
+  const totalQty = cart.reduce((s,i) => s + i.qty, 0);
+
+  badge.textContent = totalQty;
+  badge.classList.toggle('visible', totalQty > 0);
+
+  if (!cart.length) {
+    el.innerHTML = '<div class="cart-empty">尚未加入任何飲料 ☕</div>';
+    return;
+  }
+  const totalPrice = cart.reduce((s,i) => s + i.total, 0);
+
+  // Build rows safely with DOM (no eval/unsafe)
+  el.innerHTML = '';
+  cart.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'cart-row';
+
+    const label = document.createElement('div');
+    label.className = 'item-label';
+    label.innerHTML =
+      `${item.emoji} <strong>${escapeHtml(item.name)}</strong>` +
+      `<div class="item-meta">${item.size} · ${item.ice} · ${item.sugar}` +
+      `${item.toppingName ? ' · ' + item.toppingName : ''} × ${item.qty}</div>`;
+
+    const price = document.createElement('span');
+    price.className = 'item-price-tag';
+    price.textContent = `NT$ ${item.total}`;
+
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '✕';
+    btn.addEventListener('click', () => removeFromCart(idx));
+
+    row.appendChild(label);
+    row.appendChild(price);
+    row.appendChild(btn);
+    el.appendChild(row);
+  });
+
+  const total = document.createElement('div');
+  total.className = 'cart-total';
+  total.innerHTML = `<span>總計</span><span class="price">NT$ ${totalPrice}</span>`;
+  el.appendChild(total);
+};
+
+document.getElementById('cartFab').addEventListener('click', () => {
+  document.getElementById('cartSection').scrollIntoView({ behavior:'smooth' });
+});
+
+/* ─────────────────────────────────
+   VALIDATION
+───────────────────────────────── */
+const setFieldError = (fieldId, errId, show) => {
+  const el  = document.getElementById(fieldId);
+  const err = document.getElementById(errId);
+  el.classList.toggle('invalid', show);
+  el.classList.toggle('valid', !show && el.value);
+  err.classList.toggle('show', show);
+};
+
+const validateAll = () => {
+  let ok = true;
+
+  const name = sanitizeText(document.getElementById('name').value, 30);
+  if (!name || name.length < 2) {
+    setFieldError('name','nameError', true); ok = false;
+  } else setFieldError('name','nameError', false);
+
+  const phone = document.getElementById('phone').value.replace(/\D/g,'');
+  if (!/^09\d{8}$/.test(phone)) {
+    setFieldError('phone','phoneError', true); ok = false;
+  } else setFieldError('phone','phoneError', false);
+
+  if (deliveryMode === 'delivery') {
+    const addr = sanitizeText(document.getElementById('address').value, 100);
+    if (!addr || addr.length < 10) {
+      setFieldError('address','addressError', true); ok = false;
+    } else setFieldError('address','addressError', false);
+  }
+
+  if (!cart.length) {
+    showToast('購物車是空的，請先加入飲料', 'error'); ok = false;
+  }
+  return ok;
+};
+
+/* ─────────────────────────────────
+   SUBMIT
+───────────────────────────────── */
+const isFileProtocol = location.protocol === 'file:';
+
+const submitOrder = async () => {
+  if (!validateAll()) return;
+
+  if (!canSubmit()) {
+    const secs = nextAvailable();
+    document.getElementById('rateLimitMsg').textContent = `⚠️ 提交過於頻繁，請 ${secs} 秒後再試`;
+    showToast(`請稍候 ${secs} 秒再送出`, 'error');
+    return;
+  }
+  document.getElementById('rateLimitMsg').textContent = '';
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  const payload = {
+    _token: getSessionToken(),
+    customer: {
+      name:    sanitizeText(document.getElementById('name').value, 30),
+      phone:   document.getElementById('phone').value.replace(/\D/g,''),
+      address: deliveryMode === 'delivery'
+        ? sanitizeText(document.getElementById('address').value, 100)
+        : '自取',
+      note: sanitizeText(document.getElementById('note').value, 200),
+    },
+    deliveryMode,
+    items: cart.map(({ id, name, size, topping, toppingName, ice, sugar, qty, unitPrice, total }) =>
+      ({ id, name, size, topping, toppingName, ice, sugar, qty, unitPrice, total })
+    ),
+    totalAmount: cart.reduce((s,i) => s + i.total, 0),
+    timestamp: new Date().toISOString(),
+  };
+
+  // ── 模擬模式（file:// 或後端未啟動）──
+  const simulateSuccess = () => {
+    const fakeId = 'BO-' + Array.from(crypto.getRandomValues(new Uint8Array(3)))
+      .map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+    cart = []; saveCart();
+    localStorage.removeItem(LS_FORM);
+    const addr = encodeURIComponent(
+      deliveryMode === 'delivery'
+        ? sanitizeText(document.getElementById('address').value, 100)
+        : '自取'
+    );
+    // file:// 模式直接指向 localhost:3000 的 status 頁
+    const base = isFileProtocol ? 'http://localhost:3000' : API_BASE;
+    window.location.href = `${base}/status?id=${fakeId}&mode=${deliveryMode}&addr=${addr}`;
+  };
+
+  if (isFileProtocol) {
+    // 直接用 file:// 開啟時，無法 fetch，直接模擬
+    await new Promise(r => setTimeout(r, 600)); // 假延遲
+    simulateSuccess();
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    return;
+  }
+
+  try {
+    const res  = await fetch(`${API_BASE}/api/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-Session-Token': getSessionToken(),
+      },
+      body: JSON.stringify(payload),
+      credentials: API_BASE ? 'omit' : 'same-origin',
+    });
+    const json = await res.json();
+    if (res.ok && json.success) {
+      cart = []; saveCart();
+      localStorage.removeItem(LS_FORM);
+      // 跳轉到狀態追蹤頁
+      const addr = encodeURIComponent(
+        deliveryMode === 'delivery'
+          ? sanitizeText(document.getElementById('address').value, 100)
+          : '自取'
+      );
+      const statusUrl = `${API_BASE}/status?id=${json.orderId}&mode=${deliveryMode}&addr=${addr}`;
+      window.location.href = statusUrl;
+    } else {
+      showToast(json.message || '送出失敗，請稍後再試', 'error');
+    }
+  } catch {
+    simulateSuccess();
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+};
+
+document.getElementById('submitBtn').addEventListener('click', submitOrder);
+
+/* ─────────────────────────────────
+   TOAST
+───────────────────────────────── */
+let toastTimer;
+const showToast = (msg, type = 'success') => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+};
+
+/* ─────────────────────────────────
+   INIT
+───────────────────────────────── */
+renderMenu();
+loadForm();
+loadCart();
+setMode(deliveryMode, false);
+applyDrinkRules(); // 初始化規格限制狀態
+
+window.addEventListener('beforeunload', e => {
+  if (cart.length) {
+    e.preventDefault();
+    e.returnValue = '購物車尚有飲料，確定要離開嗎？';
+  }
+});
+</script>
+</body>
+</html>
