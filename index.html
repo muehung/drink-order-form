@@ -598,12 +598,15 @@
    API BASE URL 自動偵測
    - 從 Node server (port 3000) 開 → 相對路徑
    - 從 Live Server (port 5500) 開 → 指向 localhost:3000
+   - 部署在 Render → 指向 https://drink-order-form.onrender.com
 ───────────────────────────────── */
 const API_BASE = (() => {
   const { protocol, hostname, port } = location;
   if (protocol === 'file:') return '';           // file:// → 模擬模式（無法跨 origin）
   if (port === '5500' || port === '5501')        // VS Code Live Server
     return `http://${hostname}:3000`;
+  if (hostname.includes('onrender.com'))        // Render 部署
+    return `https://${hostname}`;
   return '';                                      // 同 port（node server.js）→ 相對路徑
 })();
 
